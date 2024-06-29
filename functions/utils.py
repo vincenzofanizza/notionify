@@ -93,7 +93,7 @@ class NotionInterface:
         As an expert business researcher, your task is to extract the most important insights from the given content. Follow these steps:
         1. Carefully look at the content and identify any claim, fact, or observation.
         2. Write a draft of the report including all information identified in step 1. Report as much quantitative data as possible, as they can be used for further analysis.
-        3. Proofread your draft and look for information you omitted. Iterate over it until all key information are included in the report.
+        3. Proofread your draft and look for information you omitted: report news headlines, insights, and so on. Iterate over it until all key information are included in the report.
         4. Add in-line links for further reading.
         5. Complete the summary by adding an introduction and a conclusion.
                         
