@@ -36,7 +36,7 @@ class ApifyInterface:
                 "maxConcurrency": 10,
                 "maxCrawlDepth": 1,
                 "maxCrawlPages": 1,
-                "dynamicContentWaitSecs": 1
+                "dynamicContentWaitSecs": 5
             },
             timeout_secs=180,
             memory_mbytes=8192,
@@ -92,11 +92,10 @@ class NotionInterface:
         template=dedent("""
         As an expert business researcher, your task is to extract the most important insights from the given content. Follow these steps:
         1. Carefully look at the content and identify any claim, fact, or observation.
-        3. Write a draft of the report including all information identified in step 1.
-        4. Check that the idea and message conveyed in the content are clear to the reader.
-        5. Iterate over the draft until all key information are included in the report.
-        6. If the content provides an external reference and you are talking about that, include it in the report for further reading.
-        7. Complete the summary by adding an introduction and a conclusion.
+        2. Write a draft of the report including all information identified in step 1. Report as much quantitative data as possible, as they can be used for further analysis.
+        3. Proofread your draft and look for information you omitted. Iterate over it until all key information are included in the report.
+        4. Add in-line links for further reading.
+        5. Complete the summary by adding an introduction and a conclusion.
                         
         NOTE:
         - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links.
