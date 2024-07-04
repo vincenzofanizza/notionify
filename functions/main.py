@@ -17,7 +17,7 @@ initialize_app()
 @https_fn.on_request(
     region="europe-west1",
     max_instances=2,
-    timeout_sec=300,
+    timeout_sec=540,
     memory=options.MemoryOption.GB_2,
     cors=options.CorsOptions(
         cors_origins=[f"chrome-extension://{os.environ['CHROME_EXTENSION_ID']}"],

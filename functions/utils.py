@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from langchain_community.utilities import ApifyWrapper
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
-from langchain_cohere import ChatCohere
+from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from notion_client import Client
 
@@ -20,28 +20,46 @@ logger = logging.getLogger(__name__)
 
 
 class ApifyInterface:
+    default_run_input = {
+        "crawlerType": "playwright:firefox",
+        "requestTimeoutSecs": 60,
+        "initialConcurrency": 3,
+        "maxConcurrency": 10,
+        "maxCrawlDepth": 1,
+        "maxCrawlPages": 1,
+        "proxyConfiguration": {
+            "useApifyProxy": True,
+            "apifyProxyGroups": ["RESIDENTIAL"]
+        },
+        "dynamicContentWaitSecs": 5
+    }
+
     def __init__(self):
         self.client = ApifyWrapper()
 
     def scrape_page(self, url: str) -> str:
         logger.info(f"Scraping page: {url}")
-        loader = self.client.call_actor(
-            actor_id="apify/website-content-crawler",
-            run_input={
-                "startUrls": [{"url": url}],
-                "saveHtmlAsFile": True,
-                "saveMarkdown": False,
-                "requestTimeoutSecs": 120,
-                "initialConcurrency": 3,
-                "maxConcurrency": 10,
-                "maxCrawlDepth": 1,
-                "maxCrawlPages": 1,
-                "dynamicContentWaitSecs": 5
-            },
-            timeout_secs=180,
-            memory_mbytes=8192,
-            dataset_mapping_function=lambda item: Document(page_content=item.get("text", "")))
-        return loader.load()[0].page_content
+
+        trials = [
+            {"saveHtmlAsFile": True, "saveMarkdown": False},
+            {"saveHtmlAsFile": False, "saveMarkdown": True}
+        ]
+
+        while trials:
+            try:
+                loader = self.client.call_actor(
+                    actor_id="apify/website-content-crawler",
+                    run_input={**self.default_run_input, "startUrls": [{"url": url}], **trials.pop()},
+                    timeout_secs=180,
+                    memory_mbytes=8192,
+                    dataset_mapping_function=lambda item: Document(page_content=item.get("markdown", "") or item.get("text", ""))
+                )
+                return loader.load()[0].page_content
+            except Exception as e:
+                logger.error(f"Failed to scrape page. Reason: {e}")
+
+                if not trials:
+                    raise e
 
 class NotionInterface:
     h_re_pattern = r"^#+ "
@@ -91,15 +109,20 @@ class NotionInterface:
     SUMMARY_PROMPT = PromptTemplate.from_template(
         template=dedent("""
         As an expert business researcher, your task is to extract the most important insights from the given content. Follow these steps:
-        1. Carefully look at the content and identify any claim, fact, or observation.
+        1. Carefully look at the content and identify any claim, fact, observation, and reference link.
         2. Write a draft of the report including all information identified in step 1. Report as much quantitative data as possible, as they can be used for further analysis.
         3. Proofread your draft and look for information you omitted: report news headlines, insights, and so on. Iterate over it until all key information are included in the report.
-        4. Add in-line links for further reading.
+        4. Enrich the summary with the external links in the original content (they are markdown-formatted: [link text](link URL)). Add **all of them** naturally in the text, without creating a separate list.
+            Examples: 
+                - [YC cohorts grew to over 400 companies](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
+                - Investors express concerns about [inflated YC valuations on LinkedIn](https://www.linkedin.com/posts/pliv_im-not-the-first-to-say-it-yc-valuations-activity-7105989312206270464-PsGS/) and [Twitter](https://x.com/Jeffreyw5000/status/1693216678069284983).
         5. Complete the summary by adding an introduction and a conclusion.
                         
         NOTE:
-        - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links.
-        - Do not include tables.
+        - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links. 
+        - Again, you should include all the external links in the summary. Rewrite the text to include them naturally if necessary.
+        - Make sure formatting is not conflicting. For example, don't highlight links in bold.
+        - Do not include tables or code.
         - When structuring your response, **only use one type of list: either numbered or bulleted**.
         - Your response should only include the summary. Do not start with "Here is a summary of the key insights from the content provided".
 
@@ -188,7 +211,7 @@ class NotionInterface:
         logger.info("summarizing content")
         prompt_value = self.SUMMARY_PROMPT.invoke({"content": content})
 
-        llm = ChatCohere(model="command-r-plus")
+        llm = ChatOpenAI(model="gpt-4o")
         result = llm.invoke(prompt_value).content
 
         logger.info(f"Summarized content: {result}")
