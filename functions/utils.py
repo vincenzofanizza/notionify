@@ -91,9 +91,16 @@ class NotionInterface:
     
     CLEANING_PROMPT = PromptTemplate.from_template(
         template=dedent("""
-        Clean the markdown formatting of the given content:
-        - Remove the main title from the first line, if present.
-        - Leave any formatting intact, like headings, bold/italic text, and lists.
+        Your task is to improve the formatting of the given content. Follow these steps:
+        1. Remove the main title from the first line, if present.
+        2. Clean the markdown formatting in the following cases:
+            - Bold links: in case a link is also formatted as bold, remove the bold formatting: "**[link text](https://example.com)**" should become "[link text](https://example.com)"
+            - Nested lists: in case a list is used within another list, rewrite the content so that the nested list is part of the outer list item.
+        3. Remove code snippets completely. They shouldn't be present at all in the content.
+        4. Leave any formatting intact.
+                        
+        NOTES:
+        - Do not modify the content text except to remove the main title, nested lists, and code snippets. Otherwise only change the formatting.
         - Only provide the cleaned content in your response. Do not start with phrases like "Here is the cleaned content:".
         
                         
@@ -118,12 +125,11 @@ class NotionInterface:
                 - Investors express concerns about [inflated YC valuations on LinkedIn](https://www.linkedin.com/posts/pliv_im-not-the-first-to-say-it-yc-valuations-activity-7105989312206270464-PsGS/) and [Twitter](https://x.com/Jeffreyw5000/status/1693216678069284983).
         5. Complete the summary by adding an introduction and a conclusion.
                         
-        NOTE:
+        NOTES:
         - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links. 
         - Again, you should include all the external links in the summary. Rewrite the text to include them naturally if necessary.
-        - Make sure formatting is not conflicting. For example, don't highlight links in bold.
-        - Do not include tables or code.
-        - When structuring your response, **only use one type of list: either numbered or bulleted**.
+        - Tables and code snippets are not allowed in the summary.
+        - When structuring your response, **only use one type of list: either numbered or bulleted**. **You cannot use nested lists**.
         - Your response should only include the summary. Do not start with "Here is a summary of the key insights from the content provided".
 
                                                     
