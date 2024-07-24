@@ -123,7 +123,7 @@ class NotionInterface:
             Examples: 
                 - [YC cohorts grew to over 400 companies](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
                 - Investors express concerns about [inflated YC valuations on LinkedIn](https://www.linkedin.com/posts/pliv_im-not-the-first-to-say-it-yc-valuations-activity-7105989312206270464-PsGS/) and [Twitter](https://x.com/Jeffreyw5000/status/1693216678069284983).
-        5. Complete the summary by adding an introduction and a conclusion.
+        5. Complete the summary by adding an introduction and a conclusion, adding a heading to both sections.
                         
         NOTES:
         - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links. 
@@ -217,7 +217,7 @@ class NotionInterface:
         logger.info("summarizing content")
         prompt_value = self.SUMMARY_PROMPT.invoke({"content": content})
 
-        llm = ChatOpenAI(model="gpt-4o")
+        llm = ChatOpenAI(model="gpt-4o-mini")
         result = llm.invoke(prompt_value).content
 
         logger.info(f"Summarized content: {result}")
