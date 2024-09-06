@@ -56,7 +56,7 @@ class ApifyInterface:
                     actor_id="apify/website-content-crawler",
                     run_input={**self.default_run_input, "startUrls": [{"url": url}], **trials.pop()},
                     timeout_secs=180,
-                    memory_mbytes=8192,
+                    memory_mbytes=4096,
                     dataset_mapping_function=lambda item: Document(page_content=item.get("markdown", "") or item.get("text", ""))
                 )
                 return loader.load()[0].page_content
@@ -325,7 +325,7 @@ class NotionInterface:
         # Split content by paragraphs and create blocks
         children_blocks = []
         for block in report.content.split("\n"):
-            if not block.startswith("   "): block = block.strip()        
+            block = block.strip()        
             if not block: continue
 
             block_type = self.__identify_block_type(block)
