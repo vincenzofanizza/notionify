@@ -5,19 +5,24 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from langchain_community.utilities import ApifyWrapper
+from langchain.output_parsers import PydanticOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from notion_client import Client
 
-from textwrap import dedent
 from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
+class Report(BaseModel):
+    title: str = Field(description="A clear and concise title of the report")
+    content: str = Field(description="The content of the report")
 
 class ApifyInterface:
     default_run_input = {
@@ -62,85 +67,176 @@ class ApifyInterface:
                     raise e
 
 class NotionInterface:
+    # Regex patterns
     h_re_pattern = r"^#+ "
-    h1_pattern = "# "
-    h2_pattern = "## "
-    h3_pattern = "###"  # NOTE: No trailing space to label h4, h5, and so on as h3.
     numbered_list_re_pattern = r"^\d+\. "
     bulleted_list_re_pattern = r"^[-*] "
     bold_re_pattern = r"\*\*[^*]+\*\*"
     italic_re_pattern = r"\*[^*]+\*"
     link_re_pattern = r"\[.*?\)"
 
-    TITLE_PROMPT = PromptTemplate.from_template(
-        template=dedent("""
-        As an expert business researcher, your task is to assign a title to the given content. Follow these steps:
-        1. Carefully read the report.
-        2. Assign a clear and concise title to the report.
-        3. Your response should consist of only the title in plain text. Do not add extra formatting like headings or bold/italic text.
-        
-                        
-        ------------------
-        CONTENT:
-
-        {content}
-                        
-
-        ------------------
-        TITLE:"""))
+    # Markdown patterns
+    h1_pattern = "# "
+    h2_pattern = "## "
+    h3_pattern = "###"  # NOTE: No trailing space to label h4, h5, and so on as h3.
     
     CLEANING_PROMPT = PromptTemplate.from_template(
-        template=dedent("""
-        Your task is to improve the formatting of the given content. Follow these steps:
-        1. Remove the main title from the first line, if present.
-        2. Clean the markdown formatting in the following cases:
-            - Bold links: in case a link is also formatted as bold, remove the bold formatting: "**[link text](https://example.com)**" should become "[link text](https://example.com)"
-            - Nested lists: in case a list is used within another list, rewrite the content so that the nested list is part of the outer list item.
-        3. Remove code snippets completely. They shouldn't be present at all in the content.
-        4. Leave any formatting intact.
+        template="""
+        Your task is to improve the formatting of the provided content. Follow these steps:
+
+        1. Remove the main title if it appears on the first line.
+        2. Clean markdown formatting:
+            - Remove bold formatting from links: "**[link text](https://example.com)**" should be "[link text](https://example.com)".
+            - Merge the children list into the parent list item as descriptive text.
+        3. Remove any code snippets entirely.
+        4. Preserve all other formatting.
+
+
+        ------------------
+        Formatting Guidelines:
+
+        - Only adjust formatting; do not change the text, except for removing the title, nested lists, and code snippets.
+        - Provide only the cleaned content without introductory phrases like "Here is the cleaned content."
+
                         
-        NOTES:
-        - Do not modify the content text except to remove the main title, nested lists, and code snippets. Otherwise only change the formatting.
-        - Only provide the cleaned content in your response. Do not start with phrases like "Here is the cleaned content:".
+        ------------------
+        Here's an example of the formatting your report should follow:
+
+        ## Overview
+
+        - Y Combinator (YC) offers tactical and fundamental advice to startups, aiming to guide them towards success.
+        - The key message is to launch products immediately, gather customer feedback, and iterate, rather than waiting for perfection.
+        - This report provides an overview of YC's essential advice for startups, covering topics such as product launch, customer relationships, growth, fundraising, and founder well-being.
+
+        ## Launch and Customer Feedback
+
+        - Launch your product immediately, even if it's mediocre, to understand customers' problems and needs.
+        - Do things that don't scale initially to acquire your first customers and figure out their needs.
+        - Look for the "90/10 solution": achieve 90% of your goal with 10% of the effort by focusing on solving real customer problems quickly.
+        - Talk to your users and gather feedback to improve your product and drive growth.
+
+        ## Customer Relationships and Growth
+
+        - Choose your customers wisely—a small group of customers who love your product is more valuable than a large group with mild interest.
+        - Be willing to "fire" customers who are costly or distracting from your main goals.
+        - Growth is a result of building a great product that solves customer problems, so focus on product-market fit first.
+        - Understand that poor retention and unprofitable products will hinder growth.
+
+        ## Focus and Priorities
+
+        - Do less, but do it well—resist the temptation to chase big deals or spread yourself too thin.
+        - Choose one or two key metrics to measure success and base your decisions on their impact.
+        - Address the most acute problems your customers have, rather than trying to solve every issue at once.
+
+        ## Fundraising and Valuation
+
+        - Raise money quickly and then focus on improving your company's prospects.
+        - Remember that valuation does not equal success—some successful companies raised funds with tiny initial valuations.
+        - The money you raise is not your money—spend it with a fiduciary and ethical duty to benefit your company.
+
+        ## Founder Well-being and Relationships
+
+        - Take care of yourself—get enough sleep and exercise, and maintain relationships with friends and family.
+        - Foster open and honest communication with your co-founders—strong founder relationships are crucial to success.
+        - Be nice—mean people and toxic work environments hinder success.
+
+        ## Conclusion
+
+        YC's advice emphasizes the importance of customer feedback, focused growth, and founder well-being. By launching early, iterating based on customer input, and staying true to their vision, startups can find success. Remember that the road to success is often bumpy, and broken processes or founder disagreements are normal and can be overcome with dedication and open communication.
+
+
+        ------------------
+        Here's the content you need to clean:
+
+        {content}
+                        
+
+        ------------------
+        Output the cleaned content here:
         
+        """)
                         
+    REPORT_PROMPT = PromptTemplate.from_template(
+        template="""
+        As an expert business researcher, your task is to extract key insights from the provided content. Follow these steps:
+
+        1. Review the content to identify claims, facts, observations, and reference links.
+        2. Draft a report that includes all identified information, emphasizing quantitative data for further analysis.
+        3. Proofread the draft for omitted details, including news headlines and insights. Iterate until all key points are captured. Include as much detail as possible for a thorough analysis.
+        4. Incorporate all external links naturally within the text (in markdown format: [link text](link URL)) without creating a separate list.  
+            Example: [YC cohorts grew](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
+        5. Add an introduction and conclusion with appropriate headings.
+
+
         ------------------
-        CONTENT:
+        Formatting Guidelines:
+
+        - Use neat markdown: headings for sections, bold for emphasis, and lists for structure (choose either bulleted or numbered). 
+        - Nested lists are not allowed. Merge the children list into the parent list item as descriptive text.
+        - No tables or code snippets are allowed.
+        - Include all external links within the report.
+
+
+        ------------------
+        Here's an example of the formatting your report should follow:
+        
+        ## Overview
+
+        - Y Combinator (YC) offers tactical and fundamental advice to startups, aiming to guide them towards success.
+        - The key message is to launch products immediately, gather customer feedback, and iterate, rather than waiting for perfection.
+        - This report provides an overview of YC's essential advice for startups, covering topics such as product launch, customer relationships, growth, fundraising, and founder well-being.
+
+        ## Launch and Customer Feedback
+
+        - Launch your product immediately, even if it's mediocre, to understand customers' problems and needs.
+        - Do things that don't scale initially to acquire your first customers and figure out their needs.
+        - Look for the "90/10 solution": achieve 90% of your goal with 10% of the effort by focusing on solving real customer problems quickly.
+        - Talk to your users and gather feedback to improve your product and drive growth.
+
+        ## Customer Relationships and Growth
+
+        - Choose your customers wisely—a small group of customers who love your product is more valuable than a large group with mild interest.
+        - Be willing to "fire" customers who are costly or distracting from your main goals.
+        - Growth is a result of building a great product that solves customer problems, so focus on product-market fit first.
+        - Understand that poor retention and unprofitable products will hinder growth.
+
+        ## Focus and Priorities
+
+        - Do less, but do it well—resist the temptation to chase big deals or spread yourself too thin.
+        - Choose one or two key metrics to measure success and base your decisions on their impact.
+        - Address the most acute problems your customers have, rather than trying to solve every issue at once.
+
+        ## Fundraising and Valuation
+
+        - Raise money quickly and then focus on improving your company's prospects.
+        - Remember that valuation does not equal success—some successful companies raised funds with tiny initial valuations.
+        - The money you raise is not your money—spend it with a fiduciary and ethical duty to benefit your company.
+
+        ## Founder Well-being and Relationships
+
+        - Take care of yourself—get enough sleep and exercise, and maintain relationships with friends and family.
+        - Foster open and honest communication with your co-founders—strong founder relationships are crucial to success.
+        - Be nice—mean people and toxic work environments hinder success.
+
+        ## Conclusion
+
+        YC's advice emphasizes the importance of customer feedback, focused growth, and founder well-being. By launching early, iterating based on customer input, and staying true to their vision, startups can find success. Remember that the road to success is often bumpy, and broken processes or founder disagreements are normal and can be overcome with dedication and open communication.
+                                                  
+
+        ------------------
+        Here's the content you need to generate the report:
 
         {content}
                         
+        
+        ------------------                        
+        {format_instructions}
 
+       
         ------------------
-        CLEANED CONTENT:"""))
-                        
-    SUMMARY_PROMPT = PromptTemplate.from_template(
-        template=dedent("""
-        As an expert business researcher, your task is to extract the most important insights from the given content. Follow these steps:
-        1. Carefully look at the content and identify any claim, fact, observation, and reference link.
-        2. Write a draft of the report including all information identified in step 1. Report as much quantitative data as possible, as they can be used for further analysis.
-        3. Proofread your draft and look for information you omitted: report news headlines, insights, and so on. Iterate over it until all key information are included in the report.
-        4. Enrich the summary with the external links in the original content (they are markdown-formatted: [link text](link URL)). Add **all of them** naturally in the text, without creating a separate list.
-            Examples: 
-                - [YC cohorts grew to over 400 companies](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
-                - Investors express concerns about [inflated YC valuations on LinkedIn](https://www.linkedin.com/posts/pliv_im-not-the-first-to-say-it-yc-valuations-activity-7105989312206270464-PsGS/) and [Twitter](https://x.com/Jeffreyw5000/status/1693216678069284983).
-        5. Complete the summary by adding an introduction and a conclusion, adding a heading to both sections.
-                        
-        NOTES:
-        - Format your response in neat markdown. Use headings for paragraphs, bold to highlight text, lists for structured content and in-line links. 
-        - Again, you should include all the external links in the summary. Rewrite the text to include them naturally if necessary.
-        - Tables and code snippets are not allowed in the summary.
-        - When structuring your response, **only use one type of list: either numbered or bulleted**. **You cannot use nested lists**.
-        - Your response should only include the summary. Do not start with "Here is a summary of the key insights from the content provided".
-
-                                                    
-        ------------------
-        CONTENT:
-
-        {content}
-
-                        
-        ------------------
-        SUMMARY:"""))
+        Output your generated report here:
+        
+        """)
 
 
     def __init__(self):
@@ -159,22 +255,16 @@ class NotionInterface:
             return "bulleted_list_item"
         return "paragraph"
     
-    def __assign_title(self, content: str) -> str:
-        logger.info("Assigning title")
-        prompt_value = self.TITLE_PROMPT.invoke({"content": content})
-
-        llm = ChatGroq(model="llama3-70b-8192")
-        result = llm.invoke(prompt_value).content
-
-        logger.info(f"Title: {result}")
-        return result.replace("\"", "")
-    
     def __clean_content(self, content: str) -> str:
         logger.info("Cleaning content")
-        prompt_value = self.CLEANING_PROMPT.invoke({"content": content})
 
-        llm = ChatGroq(model="llama3-70b-8192")
-        result = llm.invoke(prompt_value).content
+        # Create cleaning chain
+        llm = ChatGroq(model="llama3-70b-8192", temperature=0)
+        chain = self.CLEANING_PROMPT | llm
+
+        result = chain.invoke({"content": content}).content
+
+        logger.info(f"Cleaned content: {result}")
         return result
 
     def __create_block(self, text: str, block_type: str) -> dict:
@@ -213,24 +303,29 @@ class NotionInterface:
             }
         }
     
-    def summarize_content(self, content: str) -> str:
-        logger.info("summarizing content")
-        prompt_value = self.SUMMARY_PROMPT.invoke({"content": content})
+    def generate_report(self, content: str) -> Report:
+        logger.info("Generating report")
 
-        llm = ChatOpenAI(model="gpt-4o-mini")
-        result = llm.invoke(prompt_value).content
+        # Create report chain
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        parser = PydanticOutputParser(pydantic_object=Report)
+        chain = self.REPORT_PROMPT | llm | parser
 
-        logger.info(f"Summarized content: {result}")
+        result = chain.invoke({
+            "content": content,
+            "format_instructions": parser.get_format_instructions(), 
+        })
+
+        logger.info(f"Generated report: {result}")
         return result
 
-    def create_page(self, url: str, content: str, icon: str | None = None) -> dict:
-        title = self.__assign_title(content)
-        cleaned_content = self.__clean_content(content)
+    def create_page(self, url: str, report: Report, icon: str | None = None) -> dict:
+        report.content = self.__clean_content(report.content)
         
         # Split content by paragraphs and create blocks
         children_blocks = []
-        for block in cleaned_content.split("\n"):
-            block = block.strip()        
+        for block in report.content.split("\n"):
+            if not block.startswith("   "): block = block.strip()        
             if not block: continue
 
             block_type = self.__identify_block_type(block)
@@ -242,7 +337,7 @@ class NotionInterface:
                 "database_id": os.environ["NOTION_DATABASE_ID"]
             },
             "properties": {
-                "Name": {"title": [{"text": {"content": title}}]},
+                "Name": {"title": [{"text": {"content": report.title}}]},
                 "URL": {"url": url}
             },
             "children": children_blocks

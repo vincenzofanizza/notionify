@@ -41,11 +41,11 @@ def create_page(req: https_fn.Request) -> https_fn.Response:
         # Find favicon
         icon = find_favicon(url)
 
-        # Summarize content
-        summary = notion.summarize_content(page_content)
+        # Generate report
+        report = notion.generate_report(page_content)
 
         # Create new page
-        page = notion.create_page(url, summary, icon)
+        page = notion.create_page(url, report, icon)
 
         return https_fn.Response(status=200, response=page["url"])
     except Exception as e:
