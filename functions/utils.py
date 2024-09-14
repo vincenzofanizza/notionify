@@ -152,7 +152,7 @@ class NotionInterface:
                         
 
         ------------------
-        Output the cleaned content here:
+        Output the cleaned content here, without any additional content like "Here's the cleaned content":
         
         """)
                         
@@ -234,7 +234,7 @@ class NotionInterface:
 
        
         ------------------
-        Output your generated report here:
+        Output your generated report here, without any additional content like "Here's the report". Don't add a main title:
         
         """)
 
