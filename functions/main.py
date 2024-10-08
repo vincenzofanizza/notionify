@@ -1,11 +1,11 @@
 import os
 import logging
-
+from urllib.parse import urlparse
 from firebase_functions import https_fn, options
 from firebase_admin import initialize_app
 from dotenv import load_dotenv
 
-from utils import ApifyInterface, NotionInterface, find_favicon
+from utils import ApifyInterface, YoutubeInterface, NotionInterface
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 initialize_app()
+
 
 @https_fn.on_request(
     region="europe-west1",
@@ -22,7 +23,8 @@ initialize_app()
     cors=options.CorsOptions(
         cors_origins=[f"chrome-extension://{os.environ['CHROME_EXTENSION_ID']}"],
         cors_methods=["get", "post"],
-    ))
+    ),
+)
 def create_page(req: https_fn.Request) -> https_fn.Response:
     url = req.args.get("url")
     if not url:
@@ -32,19 +34,18 @@ def create_page(req: https_fn.Request) -> https_fn.Response:
         logger.info(f"Creating new page for {url}")
         setup_logger()
 
-        apify = ApifyInterface()
-        notion = NotionInterface()
+        if urlparse(url).hostname in ("youtube.com", "youtu.be"):
+            scraper = YoutubeInterface()
+        else:
+            scraper = ApifyInterface()
+        notion = NotionInterface(scraper.database_id)
 
         # Scrape content
-        page_content = apify.scrape_page(url)
-
-        # Find favicon
-        icon = find_favicon(url)
+        content = scraper.scrape(url)
+        icon = scraper.get_favicon(url)
 
         # Generate report
-        report = notion.generate_report(page_content)
-
-        # Create new page
+        report = notion.generate_report(content)
         page = notion.create_page(url, report, icon)
 
         return https_fn.Response(status=200, response=page["url"])

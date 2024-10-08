@@ -12,6 +12,8 @@ from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from notion_client import Client
+from youtube_transcript_api import YouTubeTranscriptApi
+from urllib.parse import urlparse, parse_qs
 
 from dotenv import load_dotenv
 
@@ -24,6 +26,7 @@ class Report(BaseModel):
     title: str = Field(description="A clear and concise title of the report")
     content: str = Field(description="The content of the report")
 
+
 class ApifyInterface:
     default_run_input = {
         "crawlerType": "playwright:firefox",
@@ -34,30 +37,37 @@ class ApifyInterface:
         "maxCrawlPages": 1,
         "proxyConfiguration": {
             "useApifyProxy": True,
-            "apifyProxyGroups": ["RESIDENTIAL"]
+            "apifyProxyGroups": ["RESIDENTIAL"],
         },
-        "dynamicContentWaitSecs": 5
+        "dynamicContentWaitSecs": 5,
     }
 
     def __init__(self):
         self.client = ApifyWrapper()
+        self.database_id = os.environ["NOTION_WEBSITES_DATABASE_ID"]
 
-    def scrape_page(self, url: str) -> str:
+    def scrape(self, url: str) -> str:
         logger.info(f"Scraping page: {url}")
 
         trials = [
             {"saveHtmlAsFile": True, "saveMarkdown": False},
-            {"saveHtmlAsFile": False, "saveMarkdown": True}
+            {"saveHtmlAsFile": False, "saveMarkdown": True},
         ]
 
         while trials:
             try:
                 loader = self.client.call_actor(
                     actor_id="apify/website-content-crawler",
-                    run_input={**self.default_run_input, "startUrls": [{"url": url}], **trials.pop()},
+                    run_input={
+                        **self.default_run_input,
+                        "startUrls": [{"url": url}],
+                        **trials.pop(),
+                    },
                     timeout_secs=180,
                     memory_mbytes=4096,
-                    dataset_mapping_function=lambda item: Document(page_content=item.get("markdown", "") or item.get("text", ""))
+                    dataset_mapping_function=lambda item: Document(
+                        page_content=item.get("markdown", "") or item.get("text", "")
+                    ),
                 )
                 return loader.load()[0].page_content
             except Exception as e:
@@ -65,6 +75,64 @@ class ApifyInterface:
 
                 if not trials:
                     raise e
+
+    def get_favicon(self, url: str) -> str:
+        response = requests.get(url)
+        try:
+            response.raise_for_status()  # Ensure the request was successful
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Failed to fetch favicon. Reason: {e}")
+            return None
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        icon_link = None
+
+        # Look for favicon in the <link> tags
+        for rel in ["icon", "shortcut icon"]:
+            icon_link = soup.find("link", rel=rel)
+            if icon_link:
+                break
+
+        # If found, construct the absolute URL of the favicon
+        if icon_link and "href" in icon_link.attrs:
+            favicon_url = urljoin(url, icon_link["href"])
+            logger.info(f"Found favicon: {favicon_url}")
+            return favicon_url
+
+        logger.warning("No favicon found")
+        return None
+
+
+class YoutubeInterface:
+    def __init__(self):
+        self.database_id = os.environ["NOTION_VIDEOS_DATABASE_ID"]
+
+    def _extract_video_id(self, url: str) -> str:
+        parsed_url = urlparse(url)
+        if parsed_url.hostname == "youtu.be":
+            return parsed_url.path[1:]
+        if parsed_url.hostname in ("www.youtube.com", "youtube.com"):
+            if parsed_url.path == "/watch":
+                return parse_qs(parsed_url.query)["v"][0]
+            if parsed_url.path.startswith(("/embed/", "/v/")):
+                return parsed_url.path.split("/")[2]
+        return None
+
+    def _format_transcript(self, transcript: list) -> str:
+        return " ".join([entry["text"] for entry in transcript])
+
+    def scrape(self, url: str) -> str:
+        video_id = self._extract_video_id(url)
+        if not video_id:
+            raise ValueError("Invalid YouTube URL")
+
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return self._format_transcript(transcript)
+
+    def get_favicon(self, url: str) -> str:
+        logger.info(f"Using default favicon for YouTube URL: {url}")
+        return "https://img.icons8.com/?size=100&id=19318&format=png&color=000000"
+
 
 class NotionInterface:
     # Regex patterns
@@ -79,7 +147,7 @@ class NotionInterface:
     h1_pattern = "# "
     h2_pattern = "## "
     h3_pattern = "###"  # NOTE: No trailing space to label h4, h5, and so on as h3.
-    
+
     CLEANING_PROMPT = PromptTemplate.from_template(
         template="""
         Your task is to improve the formatting of the provided content. Follow these steps:
@@ -154,8 +222,9 @@ class NotionInterface:
         ------------------
         Output the cleaned content here, without any additional content like "Here's the cleaned content":
         
-        """)
-                        
+        """
+    )
+
     REPORT_PROMPT = PromptTemplate.from_template(
         template="""
         As an expert business researcher, your task is to extract key insights from the provided content. Follow these steps:
@@ -236,12 +305,13 @@ class NotionInterface:
         ------------------
         Output your generated report here, without any additional content like "Here's the report". Don't add a main title:
         
-        """)
+        """
+    )
 
-
-    def __init__(self):
+    def __init__(self, database_id: str):
         self.client = Client(auth=os.environ["NOTION_TOKEN"])
-    
+        self.database_id = database_id
+
     def __identify_block_type(self, text: str) -> str:
         if text.startswith(self.h3_pattern):
             return "heading_3"
@@ -254,7 +324,7 @@ class NotionInterface:
         if re.match(self.bulleted_list_re_pattern, text):
             return "bulleted_list_item"
         return "paragraph"
-    
+
     def __clean_content(self, content: str) -> str:
         logger.info("Cleaning content")
 
@@ -276,33 +346,51 @@ class NotionInterface:
             text = re.sub(self.bulleted_list_re_pattern, "", text)
 
         # Split text into bold, italic, and links
-        combined_pattern = f"({self.bold_re_pattern}|{self.italic_re_pattern}|{self.link_re_pattern})"
+        combined_pattern = (
+            f"({self.bold_re_pattern}|{self.italic_re_pattern}|{self.link_re_pattern})"
+        )
         split_text = [part for part in re.split(combined_pattern, text) if part]
 
         # Create rich text
         rich_text = []
         for part in split_text:
-            if not part: continue
+            if not part:
+                continue
 
             logger.info(f"Assigning rich text ({block_type}): {part}")
             if part.startswith("**"):
-                rich_text.append({"type": "text", "text": {"content": part.replace("**", "")}, "annotations": {"bold": True}})
+                rich_text.append(
+                    {
+                        "type": "text",
+                        "text": {"content": part.replace("**", "")},
+                        "annotations": {"bold": True},
+                    }
+                )
             elif part.startswith("*"):
-                rich_text.append({"type": "text", "text": {"content": part.replace("*", "")}, "annotations": {"italic": True}})
+                rich_text.append(
+                    {
+                        "type": "text",
+                        "text": {"content": part.replace("*", "")},
+                        "annotations": {"italic": True},
+                    }
+                )
             elif part.startswith("["):
                 link_text, link_url = part[1:-1].split("](")
-                rich_text.append({"type": "text", "text": {"content": link_text, "link": {"url": link_url}}})
+                rich_text.append(
+                    {
+                        "type": "text",
+                        "text": {"content": link_text, "link": {"url": link_url}},
+                    }
+                )
             else:
                 rich_text.append({"type": "text", "text": {"content": part}})
-        
+
         return {
             "object": "block",
             "type": block_type,
-            block_type: {
-                "rich_text": rich_text
-            }
+            block_type: {"rich_text": rich_text},
         }
-    
+
     def generate_report(self, content: str) -> Report:
         logger.info("Generating report")
 
@@ -311,36 +399,37 @@ class NotionInterface:
         parser = PydanticOutputParser(pydantic_object=Report)
         chain = self.REPORT_PROMPT | llm | parser
 
-        result = chain.invoke({
-            "content": content,
-            "format_instructions": parser.get_format_instructions(), 
-        })
+        result = chain.invoke(
+            {
+                "content": content,
+                "format_instructions": parser.get_format_instructions(),
+            }
+        )
 
         logger.info(f"Generated report: {result}")
         return result
 
     def create_page(self, url: str, report: Report, icon: str | None = None) -> dict:
         report.content = self.__clean_content(report.content)
-        
+
         # Split content by paragraphs and create blocks
         children_blocks = []
         for block in report.content.split("\n"):
-            block = block.strip()        
-            if not block: continue
+            block = block.strip()
+            if not block:
+                continue
 
             block_type = self.__identify_block_type(block)
             children_blocks.append(self.__create_block(block, block_type))
-        
+
         # Create new page
         kwargs = {
-            "parent": {
-                "database_id": os.environ["NOTION_DATABASE_ID"]
-            },
+            "parent": {"database_id": self.database_id},
             "properties": {
                 "Name": {"title": [{"text": {"content": report.title}}]},
-                "URL": {"url": url}
+                "URL": {"url": url},
             },
-            "children": children_blocks
+            "children": children_blocks,
         }
 
         if icon:
@@ -350,30 +439,3 @@ class NotionInterface:
 
         logger.info(f"Created new page: {page['url']}")
         return page
-
-
-def find_favicon(url: str) -> str:
-    response = requests.get(url)
-    try:
-        response.raise_for_status()  # Ensure the request was successful
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Failed to fetch favicon. Reason: {e}")
-        return None
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    icon_link = None
-
-    # Look for favicon in the <link> tags
-    for rel in ['icon', 'shortcut icon']:
-        icon_link = soup.find('link', rel=rel)
-        if icon_link:
-            break
-
-    # If found, construct the absolute URL of the favicon
-    if icon_link and 'href' in icon_link.attrs:
-        favicon_url = urljoin(url, icon_link['href'])
-        logger.info(f"Found favicon: {favicon_url}")
-        return favicon_url
-    
-    logger.warning("No favicon found")
-    return None
