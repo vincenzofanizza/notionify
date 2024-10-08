@@ -34,7 +34,7 @@ def create_page(req: https_fn.Request) -> https_fn.Response:
         logger.info(f"Creating new page for {url}")
         setup_logger()
 
-        if urlparse(url).hostname in ("youtube.com", "youtu.be"):
+        if urlparse(url).netloc in ["www.youtube.com", "youtu.be"]:
             scraper = YoutubeInterface()
         else:
             scraper = ApifyInterface()
