@@ -1,8 +1,8 @@
-# WebDigest for Notion
+# Notionify
 
 ## Overview
 
-WebDigest for Notion is a Chrome extension that provides an easy way to summarize web pages and save the summaries to Notion. It uses a combination of web scraping, natural language processing, and the Notion API to create concise reports from any web page or YouTube video.
+Notionify is a Chrome extension that provides an easy way to summarize web pages and save the summaries to Notion. It uses a combination of web scraping, natural language processing, and the Notion API to create concise reports from any web page or YouTube video.
 
 ## Features
 
