@@ -1,7 +1,7 @@
 apify-client==1.6.4
 beautifulsoup4==4.12.3
 black==24.10.0
-firebase_functions~=0.1.0
+firebase-admin==6.5.0
 firebase-functions==0.1.2
 langchain==0.2.3
 langchain-cohere==0.1.7
