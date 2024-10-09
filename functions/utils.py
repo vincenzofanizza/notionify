@@ -133,6 +133,22 @@ class YoutubeInterface:
         logger.info(f"Using default favicon for YouTube URL: {url}")
         return "https://img.icons8.com/?size=100&id=19318&format=png&color=000000"
 
+    def get_thumbnail(self, url: str) -> str:
+        video_id = self._extract_video_id(url)
+        if not video_id:
+            raise ValueError("Invalid YouTube URL")
+
+        thumbnail_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+
+        # Check if the maxresdefault thumbnail exists
+        response = requests.head(thumbnail_url)
+        if response.status_code != 200:
+            # If not, fall back to the default high-quality thumbnail
+            thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
+        logger.info(f"Using thumbnail: {thumbnail_url}")
+        return thumbnail_url
+
 
 class NotionInterface:
     # Regex patterns
@@ -409,7 +425,13 @@ class NotionInterface:
         logger.info(f"Generated report: {result}")
         return result
 
-    def create_page(self, url: str, report: Report, icon: str | None = None) -> dict:
+    def create_page(
+        self,
+        url: str,
+        report: Report,
+        icon: str | None = None,
+        cover: str | None = None,
+    ) -> dict:
         report.content = self.__clean_content(report.content)
 
         # Split content by paragraphs and create blocks
@@ -434,6 +456,9 @@ class NotionInterface:
 
         if icon:
             kwargs["icon"] = {"type": "external", "external": {"url": icon}}
+
+        if cover:
+            kwargs["cover"] = {"type": "external", "external": {"url": cover}}
 
         page = self.client.pages.create(**kwargs)
 

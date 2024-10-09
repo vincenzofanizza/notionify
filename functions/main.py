@@ -36,8 +36,10 @@ def create_page(req: https_fn.Request) -> https_fn.Response:
 
         if urlparse(url).netloc in ["www.youtube.com", "youtu.be"]:
             scraper = YoutubeInterface()
+            cover = scraper.get_thumbnail(url)
         else:
             scraper = ApifyInterface()
+            cover = None
         notion = NotionInterface(scraper.database_id)
 
         # Scrape content
@@ -46,7 +48,7 @@ def create_page(req: https_fn.Request) -> https_fn.Response:
 
         # Generate report
         report = notion.generate_report(content)
-        page = notion.create_page(url, report, icon)
+        page = notion.create_page(url, report, icon, cover)
 
         return https_fn.Response(status=200, response=page["url"])
     except Exception as e:
