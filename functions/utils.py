@@ -126,7 +126,9 @@ class YoutubeInterface:
         if not video_id:
             raise ValueError("Invalid YouTube URL")
 
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        transcript = YouTubeTranscriptApi.get_transcript(
+            video_id, languages=["en", "it", "nl"]
+        )
         return self._format_transcript(transcript)
 
     def get_favicon(self, url: str) -> str:
