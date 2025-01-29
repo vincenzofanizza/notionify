@@ -9,7 +9,7 @@ button.addEventListener('click', async () => {
     button.disabled = true;
     responseArea.innerHTML = `<p style="text-align: center;">Saving page...</p>`;
     try {
-      const response = await fetch(`https://create-page-e6tkjpppya-ew.a.run.app?url=${encodeURIComponent(url)}`);
+      const response = await fetch(`https://create-notion-page-ny7vkn2pgq-ew.a.run.app?url=${encodeURIComponent(url)}`);
       const result = await response.text();
 
       if (!response.ok) {

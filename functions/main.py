@@ -25,7 +25,7 @@ initialize_app()
         cors_methods=["get", "post"],
     ),
 )
-def create_page(req: https_fn.Request) -> https_fn.Response:
+def create_notion_page(req: https_fn.Request) -> https_fn.Response:
     url = req.args.get("url")
     if not url:
         return https_fn.Response(status=400, response="Missing 'url' parameter")
