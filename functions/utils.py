@@ -10,14 +10,13 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
 from notion_client import Client
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
 
 from dotenv import load_dotenv
 
-from prompt_templates import cleaning_prompt_template, report_prompt_template
+from prompt_templates import report_prompt_template
 
 load_dotenv()
 
@@ -26,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 class Report(BaseModel):
     title: str = Field(description="A clear and concise title of the report")
-    content: str = Field(description="The content of the report")
+    content: str = Field(
+        description="The content of the report. Do not add the main title here, instead use the appropriate field."
+    )
 
 
 class ApifyInterface:
@@ -76,7 +77,7 @@ class ApifyInterface:
                     run_input={
                         **self.website_run_input,
                         "startUrls": [{"url": url}],
-                        **trials.pop(),
+                        **trials.pop(0),
                     },
                     timeout_secs=180,
                     memory_mbytes=4096,
@@ -112,7 +113,7 @@ class ApifyInterface:
                     run_input={
                         **self.youtube_run_input,
                         "startUrls": [{"url": url, "method": "GET"}],
-                        "subtitlesLanguage": languages.pop(),
+                        "subtitlesLanguage": languages.pop(0),
                     },
                     timeout_secs=60,
                     memory_mbytes=1024,
@@ -222,7 +223,6 @@ class NotionInterface:
     h2_pattern = "## "
     h3_pattern = "###"  # NOTE: No trailing space to label h4, h5, and so on as h3.
 
-    CLEANING_PROMPT = PromptTemplate.from_template(template=cleaning_prompt_template)
     REPORT_PROMPT = PromptTemplate.from_template(template=report_prompt_template)
 
     def __init__(self, is_youtube: bool):
@@ -246,18 +246,6 @@ class NotionInterface:
             return "bulleted_list_item"
         return "paragraph"
 
-    def __clean_content(self, content: str) -> str:
-        logger.info("Cleaning content")
-
-        # Create cleaning chain
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        chain = self.CLEANING_PROMPT | llm
-
-        result = chain.invoke({"content": content}).content
-
-        logger.info(f"Cleaned content: {result}")
-        return result
-
     def __create_block(self, text: str, block_type: str) -> dict:
         if block_type.startswith("heading"):
             text = re.sub(self.h_re_pattern, "", text)
@@ -278,7 +266,7 @@ class NotionInterface:
             if not part:
                 continue
 
-            logger.info(f"Assigning rich text ({block_type}): {part}")
+            logger.info(f"Assigning rich text to block: {block_type}")
             if part.startswith("**"):
                 rich_text.append(
                     {
@@ -337,8 +325,6 @@ class NotionInterface:
         icon: str | None = None,
         cover: str | None = None,
     ) -> dict:
-        report.content = self.__clean_content(report.content)
-
         # Split content by paragraphs and create blocks
         children_blocks = []
         for block in report.content.split("\n"):

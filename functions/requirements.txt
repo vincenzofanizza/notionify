@@ -1,12 +1,9 @@
 apify-client==1.6.4
 beautifulsoup4==4.12.3
-black==24.10.0
 firebase-admin==6.5.0
 firebase-functions==0.1.2
 langchain==0.2.3
-langchain-cohere==0.1.7
 langchain-community==0.2.4
-langchain-groq==0.1.5
 langchain-openai==0.1.8
 notion-client==2.2.1
 python-dotenv==1.0.1
