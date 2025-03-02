@@ -5,7 +5,12 @@ from firebase_functions import https_fn, options
 from firebase_admin import initialize_app
 from dotenv import load_dotenv
 
-from utils import ApifyInterface, YoutubeInterface, NotionInterface
+from utils import (
+    NotionInterface,
+    scrape_website_with_apify,
+    scrape_youtube_with_apify,
+    scrape_youtube_with_transcript,
+)
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -34,21 +39,19 @@ def create_notion_page(req: https_fn.Request) -> https_fn.Response:
         logger.info(f"Creating new page for {url}")
         setup_logger()
 
-        if urlparse(url).netloc in ["www.youtube.com", "youtu.be"]:
-            scraper = YoutubeInterface()
-            cover = scraper.get_thumbnail(url)
+        is_youtube = urlparse(url).netloc in ["www.youtube.com", "youtu.be"]
+        if is_youtube:
+            try:
+                result = scrape_youtube_with_apify(url)
+            except Exception as e:
+                result = scrape_youtube_with_transcript(url)
+
         else:
-            scraper = ApifyInterface()
-            cover = None
-        notion = NotionInterface(scraper.database_id)
+            result = scrape_website_with_apify(url)
 
-        # Scrape content
-        content = scraper.scrape(url)
-        icon = scraper.get_favicon(url)
-
-        # Generate report
-        report = notion.generate_report(content)
-        page = notion.create_page(url, report, icon, cover)
+        notion = NotionInterface(is_youtube=is_youtube)
+        report = notion.generate_report(result["content"])
+        page = notion.create_page(url, report, result["icon"], result["cover"])
 
         return https_fn.Response(status=200, response=page["url"])
     except Exception as e:
