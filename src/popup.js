@@ -5,11 +5,12 @@ button.addEventListener('click', async () => {
     const activeTab = tabs[0];
     const url = activeTab.url;
     const responseArea = document.getElementById('response-area');
+    const guidance = document.getElementById('guidance-text').value;
 
     button.disabled = true;
     responseArea.innerHTML = `<p style="text-align: center;">Saving page...</p>`;
     try {
-      const response = await fetch(`https://create-notion-page-ny7vkn2pgq-ew.a.run.app?url=${encodeURIComponent(url)}`);
+      const response = await fetch(`https://create-notion-page-ny7vkn2pgq-ew.a.run.app?url=${encodeURIComponent(url)}&guidance=${encodeURIComponent(guidance)}`);
       const result = await response.text();
 
       if (!response.ok) {

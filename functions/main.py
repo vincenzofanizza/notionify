@@ -35,6 +35,8 @@ def create_notion_page(req: https_fn.Request) -> https_fn.Response:
     if not url:
         return https_fn.Response(status=400, response="Missing 'url' parameter")
 
+    guidance = req.args.get("guidance", "")
+
     try:
         logger.info(f"Creating new page for {url}")
         setup_logger()
@@ -50,7 +52,7 @@ def create_notion_page(req: https_fn.Request) -> https_fn.Response:
             result = scrape_website_with_apify(url)
 
         notion = NotionInterface(is_youtube=is_youtube)
-        report = notion.generate_report(result["content"])
+        report = notion.generate_report(result["content"], guidance)
         page = notion.create_page(url, report, result["icon"], result["cover"])
 
         return https_fn.Response(status=200, response=page["url"])

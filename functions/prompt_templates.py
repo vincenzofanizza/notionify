@@ -11,6 +11,10 @@ As an expert researcher, your task is to make a report of key insights extracted
     Example: [YC cohorts grew](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
 5. Add an introduction and conclusion with appropriate headings.
 
+# User Guidance
+The user has provided the following guidance for this report. Please focus your report accordingly:
+
+{guidance}
 
 # Format instructions
 

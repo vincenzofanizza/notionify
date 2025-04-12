@@ -300,21 +300,19 @@ class NotionInterface:
             block_type: {"rich_text": rich_text},
         }
 
-    def generate_report(self, content: str) -> Report:
-        logger.info("Generating report")
+    def generate_report(self, content: str, guidance: str = "") -> Report:
+        logger.info(f"Generating report with guidance: {guidance}")
 
         # Create report chain
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         parser = PydanticOutputParser(pydantic_object=Report)
         chain = self.REPORT_PROMPT | llm | parser
-
-        result = chain.invoke(
-            {
-                "content": content,
-                "format_instructions": parser.get_format_instructions(),
-            }
-        )
-
+        prompt_context = {
+            "content": content,
+            "guidance": guidance,
+            "format_instructions": parser.get_format_instructions(),
+        }
+        result = chain.invoke(prompt_context)
         logger.info(f"Generated report: {result}")
         return result
 
