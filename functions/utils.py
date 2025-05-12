@@ -283,7 +283,8 @@ class NotionInterface:
                         "annotations": {"italic": True},
                     }
                 )
-            elif part.startswith("["):
+            elif part.startswith("[") and part.endswith(")"):
+                print(part)
                 link_text, link_url = part[1:-1].split("](")
                 rich_text.append(
                     {
@@ -304,7 +305,7 @@ class NotionInterface:
         logger.info(f"Generating report with guidance: {guidance}")
 
         # Create report chain
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
         parser = PydanticOutputParser(pydantic_object=Report)
         chain = self.REPORT_PROMPT | llm | parser
         prompt_context = {

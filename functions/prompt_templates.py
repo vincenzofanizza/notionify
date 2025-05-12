@@ -22,6 +22,7 @@ The user has provided the following guidance for this report. Please focus your 
 - Headings 2 and 3 for sections
 - Bold (**text**) and italic (*text*) for emphasis
 - Lists for structure (choose either bulleted or numbered)
+- Do not use square brackets ([]) unless it's a link (e.g. [link text](link URL))
 - Do not use other markdown elements like tables or code snippets
 
 ## Minimize indentations
