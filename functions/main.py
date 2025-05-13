@@ -58,5 +58,4 @@ def create_notion_page(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(status=200, response=page["url"])
     except Exception as e:
         logger.error(e)
-        raise e
         return https_fn.Response(status=500, response=str(e))
