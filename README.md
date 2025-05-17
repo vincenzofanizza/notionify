@@ -19,7 +19,7 @@ Notionify is a Chrome extension that provides an easy way to summarize web pages
 - **APIs and Services**:
   - Apify for web scraping
   - YouTube Transcript API for video transcripts
-  - OpenAI 4o-mini and Groq for text generation
+  - OpenAI 4o-mini for text generation
   - Notion API for saving summaries
 - **Chrome Extension**: JavaScript
 
@@ -56,7 +56,6 @@ APIFY_API_TOKEN=your_apify_api_token
 
 # API Keys
 OPENAI_API_KEY=your_openai_api_key
-GROQ_API_KEY=your_groq_api_key
 
 # Chrome extension
 CHROME_EXTENSION_ID=your_chrome_extension_id

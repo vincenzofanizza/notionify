@@ -301,6 +301,43 @@ class NotionInterface:
             block_type: {"rich_text": rich_text},
         }
 
+    def get_database_entry(self, url: str) -> dict | None:        
+        # Create filter for the URL property
+        filter_params = {
+            "filter": {
+                "property": "URL",
+                "url": {
+                    "equals": url
+                }
+            },
+            "sorts": [
+                {
+                    "timestamp": "last_edited_time",
+                    "direction": "descending"
+                }
+            ]
+        }
+        
+        response = self.client.databases.query(
+            database_id=self.database_id,
+            **filter_params
+        )
+        
+        # Only process the first (most recent) result if any exist
+        if response["results"]:
+            page = response["results"][0]
+            title = page["properties"]["Name"]["title"][0]["text"]["content"] if page["properties"]["Name"]["title"] else "Untitled"
+            page_url = page["url"]
+            
+            return {
+                "id": page["id"],
+                "title": title,
+                "url": url,
+                "page_url": page_url,
+                "created_time": page["created_time"],
+                "last_edited_time": page["last_edited_time"]
+            }
+        
     def generate_report(self, content: str, guidance: str = "") -> Report:
         logger.info(f"Generating report with guidance: {guidance}")
 
@@ -353,8 +390,17 @@ class NotionInterface:
         page = self.client.pages.create(**kwargs)
 
         logger.info(f"Created new page: {page['url']}")
-        return page
+        return {
+            "id": page["id"], 
+            "title": report.title,
+            "url": url,
+            "page_url": page["url"],
+            "created_time": page["created_time"],
+            "last_edited_time": page["last_edited_time"]
+        }
 
+def is_youtube_url(url: str) -> bool:
+    return urlparse(url).netloc in ["www.youtube.com", "youtu.be"]
 
 def scrape_website_with_apify(url: str) -> dict:
     apify = ApifyInterface()

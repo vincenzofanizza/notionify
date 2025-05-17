@@ -2,17 +2,12 @@
   "manifest_version": 3,
   "name": "notionify",
   "description": "Summarize a web page with AI and save it to Notion.",
-  "version": "1.0",
+  "version": "0.1.0",
   "permissions": [
     "activeTab",
     "tabs"
   ],
   "action": {
     "default_popup": "popup.html"
-  },
-  "icons": {
-    "16": "assets/icon.png",
-    "48": "assets/icon.png",
-    "128": "assets/icon.png"
   }
-}
+} 
