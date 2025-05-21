@@ -1,6 +1,5 @@
 import os
 import re
-import logging
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -13,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from notion_client import Client
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
+from logger import setup_logger
 
 from dotenv import load_dotenv
 
@@ -20,7 +20,7 @@ from prompt_templates import report_prompt_template
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
 
 class Report(BaseModel):
@@ -207,6 +207,12 @@ class YoutubeInterface:
 
         logger.info(f"Using thumbnail: {thumbnail_url}")
         return thumbnail_url
+
+    def standardize_url(self, url: str) -> str:
+        video_id = self.__extract_video_id(url)
+        if not video_id:
+            raise ValueError("Invalid YouTube URL")
+        return f"https://www.youtube.com/watch?v={video_id}"
 
 
 class NotionInterface:

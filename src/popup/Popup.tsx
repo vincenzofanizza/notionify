@@ -62,9 +62,15 @@ const Popup: React.FC = () => {
     setResponse(null);
     
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+
       const response = await fetch(
-        `https://create-notion-page-ny7vkn2pgq-ew.a.run.app?url=${encodeURIComponent(currentUrl)}&guidance=${encodeURIComponent(guidance)}`
+        `https://create-notion-page-ny7vkn2pgq-ew.a.run.app?url=${encodeURIComponent(currentUrl)}&guidance=${encodeURIComponent(guidance)}`,
+        { signal: controller.signal }
       );
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -86,7 +92,7 @@ const Popup: React.FC = () => {
   };
 
   return (
-    <div className="p-2 w-[400px] font-inter">
+    <div className="p-2 w-[400px] font-inter bg-[#0A2342]">
       <Card className="bg-cream border border-gray-200 shadow-sm">
         <CardHeader>
           <CardTitle className="text-center text-3xl font-medium text-[#0A2342]">notionify</CardTitle>
@@ -97,7 +103,7 @@ const Popup: React.FC = () => {
               value={guidance}
               onChange={(e) => setGuidance(e.target.value)}
               placeholder="What should the report focus on?"
-              disabled={isLoading}
+              disabled={isLoading || isChecking}
               className="min-h-[80px] text-sm flex-1 bg-white/80 border-slate-200 placeholder:text-slate-400 text-slate-700 focus-visible:ring-1 focus-visible:ring-[#0A2342] focus-visible:border-[#0A2342] resize-handle-lg"
             />            
             <TooltipProvider>
@@ -175,7 +181,7 @@ const Popup: React.FC = () => {
           )}
         </CardContent>
       </Card>
-      <div className="text-xs mt-2 text-gray-400 pb-1 pr-2 text-right italic">v0.1.0 (alpha)</div>
+      <div className="text-xs mt-2 text-white pb-1 pr-2 text-right italic">v0.1.0 (alpha)</div>
     </div>
   );
 };

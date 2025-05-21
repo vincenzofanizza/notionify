@@ -1,7 +1,5 @@
 import os
 import json
-import logging
-from urllib.parse import urlparse
 from firebase_functions import https_fn, options
 from firebase_admin import initialize_app
 from dotenv import load_dotenv
@@ -12,15 +10,15 @@ from utils import (
     scrape_website_with_apify,
     scrape_youtube_with_apify,
     scrape_youtube_with_transcript,
+    YoutubeInterface,
 )
 from logger import setup_logger
-
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 initialize_app()
 
+logger = setup_logger()
 
 @https_fn.on_request(
     region="europe-west1",
@@ -35,13 +33,14 @@ def get_notion_page(req: https_fn.Request) -> https_fn.Response:
     url = req.args.get("url")
     if not url:
         return https_fn.Response(status=400, response="Missing 'url' parameter")
-    
+
     try:
         logger.info(f"Retrieving Notion page for URL: {url}")
-        setup_logger()
-        
+
         # Check both databases for the URL
         is_youtube = is_youtube_url(url)
+        if is_youtube:
+            url = YoutubeInterface().standardize_url(url)
         if res := NotionInterface(is_youtube=is_youtube).get_database_entry(url):
             return https_fn.Response(status=200, response=json.dumps(res))
         else:
@@ -64,20 +63,18 @@ def create_notion_page(req: https_fn.Request) -> https_fn.Response:
     url = req.args.get("url")
     if not url:
         return https_fn.Response(status=400, response="Missing 'url' parameter")
-
     guidance = req.args.get("guidance", "")
 
     try:
         logger.info(f"Creating new page for {url}...")
-        setup_logger()
 
         is_youtube = is_youtube_url(url)
         if is_youtube:
+            url = YoutubeInterface().standardize_url(url)
             try:
                 result = scrape_youtube_with_apify(url)
             except Exception as e:
                 result = scrape_youtube_with_transcript(url)
-
         else:
             result = scrape_website_with_apify(url)
 
