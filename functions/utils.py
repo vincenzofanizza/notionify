@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+from datetime import datetime
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from langchain_community.utilities import ApifyWrapper
@@ -94,8 +95,11 @@ class ApifyInterface:
         def mapping_function(item: dict) -> Document:
             if not item.get("subtitles"):
                 raise ValueError("No subtitles found")
+            
+            page_content = self.__create_youtube_content(item)
+            
             return Document(
-                page_content=str(item["subtitles"]),
+                page_content=page_content,
                 metadata={
                     "icon": self.__get_youtube_favicon(url),
                     "cover": item.get("thumbnailUrl"),
@@ -155,6 +159,41 @@ class ApifyInterface:
     def __get_youtube_favicon(self, url: str) -> str:
         logger.info(f"Using default favicon for YouTube URL: {url}")
         return "https://img.icons8.com/?size=100&id=19318&format=png&color=000000"
+
+    def __create_youtube_content(self, item: dict) -> str:
+        """Create combined content with metadata and subtitles"""
+        content_parts = []
+        
+        # Add video metadata
+        metadata_parts = []
+        if item.get("title"):
+            metadata_parts.append(f"**Video Title:** {item['title']}")
+        if item.get("channelName"):
+            metadata_parts.append(f"**Channel:** {item['channelName']}")
+        if item.get("channelUrl"):
+            metadata_parts.append(f"**Channel URL:** {item['channelUrl']}")
+        if item.get("viewCount"):
+            metadata_parts.append(f"**Views:** {item['viewCount']:,}")
+        if item.get("likes"):
+            metadata_parts.append(f"**Likes:** {item['likes']:,}")
+        if item.get("duration"):
+            metadata_parts.append(f"**Duration:** {item['duration']}")
+        if item.get("date"):
+            metadata_parts.append(f"**Published:** {item['date']}")
+        
+        if metadata_parts:
+            content_parts.append("\n".join(metadata_parts))
+            content_parts.append("")  # Add spacing
+        
+        # Add subtitle content
+        subtitles = item["subtitles"]
+        if isinstance(subtitles, list):
+            texts = [sub["plaintext"] for sub in subtitles if isinstance(sub, dict) and "plaintext" in sub]
+            content_parts.append(" ".join(texts))
+        else:
+            content_parts.append(str(subtitles))
+        
+        return "\n".join(content_parts)
 
 
 class YoutubeInterface:
@@ -223,6 +262,7 @@ class NotionInterface:
     bold_re_pattern = r"\*\*[^*]+\*\*"
     italic_re_pattern = r"\*[^*]+\*"
     link_re_pattern = r"\[.*?\)"
+    divider_re_pattern = r"^-{3,}$|^\*{3,}$|^_{3,}$"
 
     # Markdown patterns
     h1_pattern = "# "
@@ -240,6 +280,9 @@ class NotionInterface:
         )
 
     def __identify_block_type(self, text: str) -> str:
+        # Check for dividers first (---, ***, ___)
+        if re.match(self.divider_re_pattern, text):
+            return "divider"
         if text.startswith(self.h3_pattern):
             return "heading_3"
         if text.startswith(self.h2_pattern):
@@ -253,6 +296,12 @@ class NotionInterface:
         return "paragraph"
 
     def __create_block(self, text: str, block_type: str) -> dict:
+        if block_type == "divider":
+            return {
+                "object": "block",
+                "type": "divider",
+                "divider": {}
+            }
         if block_type.startswith("heading"):
             text = re.sub(self.h_re_pattern, "", text)
         if block_type == "numbered_list_item":
@@ -307,6 +356,85 @@ class NotionInterface:
             block_type: {"rich_text": rich_text},
         }
 
+    def __get_indentation_level(self, line: str) -> int:
+        """Get the indentation level of a line (number of leading spaces/tabs)"""
+        indent = len(line) - len(line.lstrip())
+        # Normalize: 2 or 4 spaces = 1 level, 1 tab = 1 level
+        if '\t' in line[:indent]:
+            return line[:indent].count('\t')
+        # Assume 2 or 4 spaces per indentation level
+        spaces = indent
+        if spaces >= 4:
+            return spaces // 4
+        elif spaces >= 2:
+            return spaces // 2
+        return 0
+    
+    def __parse_nested_blocks(self, content: str) -> list:
+        """Parse content into blocks with nested list support"""
+        lines = content.split("\n")
+        blocks = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            stripped_line = line.strip()
+            
+            # Skip empty lines
+            if not stripped_line:
+                i += 1
+                continue
+            
+            indent_level = self.__get_indentation_level(line)
+            block_type = self.__identify_block_type(stripped_line)
+            
+            # If it's a list item, check for nested children
+            if block_type in ["bulleted_list_item", "numbered_list_item"]:
+                block = self.__create_block(stripped_line, block_type)
+                
+                # Look ahead for nested items
+                children = []
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j]
+                    next_stripped = next_line.strip()
+                    
+                    if not next_stripped:
+                        j += 1
+                        continue
+                    
+                    next_indent = self.__get_indentation_level(next_line)
+                    next_type = self.__identify_block_type(next_stripped)
+                    
+                    # If it's more indented and is a list item, it's a child
+                    if next_indent > indent_level and next_type in ["bulleted_list_item", "numbered_list_item"]:
+                        # Recursively parse nested items
+                        # For now, we'll handle one level of nesting
+                        child_block = self.__create_block(next_stripped, next_type)
+                        children.append(child_block)
+                        j += 1
+                    elif next_indent <= indent_level:
+                        # Back to same or lower indentation level
+                        break
+                    else:
+                        # Different block type at higher indentation
+                        j += 1
+                
+                # Add children if any were found
+                if children:
+                    block[block_type]["children"] = children
+                    i = j  # Skip the lines we've already processed
+                else:
+                    i += 1
+                
+                blocks.append(block)
+            else:
+                # Non-list items
+                blocks.append(self.__create_block(stripped_line, block_type))
+                i += 1
+        
+        return blocks
+
     def get_database_entry(self, url: str) -> dict | None:        
         # Create filter for the URL property
         filter_params = {
@@ -355,9 +483,9 @@ class NotionInterface:
             "content": content,
             "guidance": guidance,
             "format_instructions": parser.get_format_instructions(),
+            "current_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
         result = chain.invoke(prompt_context)
-        logger.info(f"Generated report: {result}")
         return result
 
     def create_page(
@@ -367,15 +495,8 @@ class NotionInterface:
         icon: str | None = None,
         cover: str | None = None,
     ) -> dict:
-        # Split content by paragraphs and create blocks
-        children_blocks = []
-        for block in report.content.split("\n"):
-            block = block.strip()
-            if not block:
-                continue
-
-            block_type = self.__identify_block_type(block)
-            children_blocks.append(self.__create_block(block, block_type))
+        # Parse content into blocks with nested list support
+        children_blocks = self.__parse_nested_blocks(report.content)
 
         # Create new page
         kwargs = {

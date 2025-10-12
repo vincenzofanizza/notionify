@@ -1,105 +1,184 @@
 report_prompt_template = """
-# Goal
-As an expert researcher, your task is to make a report of key insights extracted from the provided content. Follow these steps:
-1. Review the content to identify claims, facts, observations, and reference links. Focus on the following information:
-    - Specific and actionable insights, such as details about new technologies, financial markets, or business strategies.
-    - Quantitative data of any kind: statistics, reports, trends, etc.
-    - Informative and educational content, such as advice for personal and professional growth.
-2. Draft a report that includes all identified information, emphasizing quantitative data for further analysis.
-3. Proofread the draft for omitted details, including news headlines and insights. Iterate until all key points are captured. Include as much detail as possible for a thorough analysis.
-4. Incorporate all external links naturally within the text (in markdown format: [link text](link URL)) without creating a separate list.  
-    Example: [YC cohorts grew](https://techcrunch.com/2022/08/02/y-combinator-narrows-current-cohort-size-by-40-citing-downturn-and-funding-environment/) before shrinking in recent years.
-5. Add an introduction and conclusion with appropriate headings.
+# 🧭 Universal Information Extraction & Insight Report Prompt
 
-# User Guidance
-The user has provided the following guidance for this report. Please focus your report accordingly:
+## Goal
 
-{guidance}
+As an expert researcher, your task is to analyze **any digital content** — whether it’s a webpage, article, video transcript, or podcast — and produce a **structured insight report**. Your goal is to extract all relevant information, summarize it clearly, and capture both **quantitative data** and **qualitative insights** that could be useful for learning, research, or strategic decision-making.
 
-# Format instructions
+---
 
-## Allowed markdown elements
-- Headings 2 and 3 for sections
-- Bold (**text**) and italic (*text*) for emphasis
-- Lists for structure (choose either bulleted or numbered)
-- Do not use square brackets ([]) unless it's a link (e.g. [link text](link URL))
-- Do not use other markdown elements like tables or code snippets
+## Step-by-step Process
 
-## Minimize indentations
-- Having lists is allowed, but nested lists make the content harder to read. If nested lists are present, merge the children list into the parent item as plain text.
+1. **Review the content** to identify:
 
-Example 1:
-- Elon Musk is the CEO of the following companies:
-    - Tesla
-    - SpaceX
-    - Neuralink
-Should be:
-- Elon Musk is the CEO of the following companies: Tesla, SpaceX, and Neuralink.
+   * **Core ideas**, arguments, and claims
+   * **Facts, statistics, and quantitative data**
+   * **Actionable insights** (e.g. tactics, frameworks, tools, or strategies)
+   * **Notable quotes**, examples, or case studies
+   * **External or reference links** — always include them inline in markdown format: `[text](URL)`
 
-Example 2:
-- The 2018-19 U.S.-China trade war resulted in:
-    - 133% decline in the Chinese Yuan
-    - 13% devaluation of major currencies against the U.S. dollar
-    - Maximum drawdown of 20% in the S&P 500
-Should be:
-- The 2018-19 U.S.-China trade war resulted in a 133% decline in the Chinese Yuan, a 13% devaluation of major currencies against the U.S. dollar, and a maximum drawdown of 20% in the S&P 500.
+2. **If the source is a video, podcast, or interview:**
 
-## External links
-Include all external links within the report.
+   * Capture **key speakers** and their **main points**.
+   * When possible, include **approximate timestamps** (e.g. `at 3:24 –`) before major insights.
+   * Note **visual cues or demonstrations** that add meaning (e.g., “shows dashboard with metrics”).
 
-{format_instructions}
+3. **If the source is an article or webpage:**
 
+   * Identify its **title, author(s), publication date, and theme/topic** (if available).
+   * Focus on extracting concrete, practical, or educational material, not filler content.
 
-# Example
-Here's an example of the formatting your report should follow:
+4. **Synthesize** all insights into a clear, structured markdown report.
 
-## Overview
+   * Use concise, factual language.
+   * Avoid repetition or fluff.
+   * Ensure the report can be read independently without referring to the original content.
 
-- Y Combinator (YC) offers tactical and fundamental advice to startups, aiming to guide them towards success.
-- The key message is to launch products immediately, gather customer feedback, and iterate, rather than waiting for perfection.
-- This report provides an overview of YC's essential advice for startups, covering topics such as product launch, customer relationships, growth, fundraising, and founder well-being.
+5. **Proofread for completeness.**
 
-## Launch and Customer Feedback
+   * Include **every unique piece of information**: statistics, named concepts, opinions, or frameworks.
+   * Verify that no significant ideas from the source are omitted.
 
-- Launch your product immediately, even if it's mediocre, to understand customers' problems and needs.
-- Do things that don't scale initially to acquire your first customers and figure out their needs.
-- Look for the "90/10 solution": achieve 90% of your goal with 10% of the effort by focusing on solving real customer problems quickly.
-- Talk to your users and gather feedback to improve your product and drive growth.
+---
 
-## Customer Relationships and Growth
+## Report Structure
 
-- Choose your customers wisely—a small group of customers who love your product is more valuable than a large group with mild interest.
-- Be willing to "fire" customers who are costly or distracting from your main goals.
-- Growth is a result of building a great product that solves customer problems, so focus on product-market fit first.
-- Understand that poor retention and unprofitable products will hinder growth.
+### Title
 
-## Focus and Priorities
+* Use the **exact title** of the article, video, podcast, or webpage as the title.
+* **IMPORTANT**: The main title goes in the **`title` field** of the JSON output, NOT in the content field.
 
-- Do less, but do it well—resist the temptation to chase big deals or spread yourself too thin.
-- Choose one or two key metrics to measure success and base your decisions on their impact.
-- Address the most acute problems your customers have, rather than trying to solve every issue at once.
+---
 
-## Fundraising and Valuation
+### 📋 Metadata
 
-- Raise money quickly and then focus on improving your company's prospects.
-- Remember that valuation does not equal success—some successful companies raised funds with tiny initial valuations.
-- The money you raise is not your money—spend it with a fiduciary and ethical duty to benefit your company.
+* The content should start directly with metadata, including:
 
-## Founder Well-being and Relationships
+  * **Author(s) / Speaker(s)**
+  * **Date or publication context** (if known)
+  * **Source type**: *Article*, *YouTube video*, *Podcast*, *Interview*, *Webpage*, etc.
+  * **Main theme or topic** (e.g. *AI product launches*, *Startup culture*, *Financial analysis*, *Technical tutorial*).
 
-- Take care of yourself—get enough sleep and exercise, and maintain relationships with friends and family.
-- Foster open and honest communication with your co-founders—strong founder relationships are crucial to success.
-- Be nice—mean people and toxic work environments hinder success.
+---
 
-## Conclusion
+### ⚡️ Summary / TL;DR
 
-YC's advice emphasizes the importance of customer feedback, focused growth, and founder well-being. By launching early, iterating based on customer input, and staying true to their vision, startups can find success. Remember that the road to success is often bumpy, and broken processes or founder disagreements are normal and can be overcome with dedication and open communication.
+* Write **5–8 bullet points** capturing the most important takeaways.
+* This section should be comprehensive enough that reading it alone provides a full understanding of the source.
 
+---
 
-# Content
-Here's the content you need to generate the report:
+### 🧠 Core Theme or Question
+
+* What **problem, idea, or question** does this content explore?
+* Why is it **important or relevant** (e.g., for entrepreneurs, researchers, or general audiences)?
+
+---
+
+### 🔍 Key Insights & Frameworks
+
+* List **key ideas, arguments, and mental models** introduced.
+* Include frameworks, principles, or structured advice (e.g., “The 3 phases of scaling a startup”).
+* Add **short quotes** or examples to clarify each idea.
+* If quantitative data or studies are mentioned, include the numbers directly.
+
+---
+
+### 🧩 Tactics, Tools, or Examples
+
+* Summarize all **practical applications** or **demonstrated tools**.
+* Include specific products, frameworks, or resources (e.g., “Uses [Perplexity](https://www.perplexity.ai) to automate research”).
+* If a demo or tutorial, outline **each major step or command shown**.
+
+---
+
+### 🗣️ Quotes & References
+
+* Capture **notable quotes**, **statistics**, or **citations** (with context).
+* Attribute quotes to specific people if known.
+* Example: *“You don’t need more features; you need more customer love,” said Brian Chesky (Airbnb founder).*
+
+---
+
+### 💼 Opportunities or Mentions (optional)
+
+* If the content mentions **companies, roles, projects, or events**, list them clearly with context:
+
+  * Company name and focus (e.g., “YC-backed AI startup hiring Founding Engineer”)
+  * Any relevant URLs or reference sources.
+
+---
+
+### 🚀 Takeaways & Applications
+
+* Conclude with **actionable insights** or **lessons learned**.
+* What can a professional, builder, or student do with this knowledge?
+* Highlight any “meta” lessons about thinking, learning, or operating more effectively.
+
+---
+
+## Additional Rules
+
+1. **Completeness**:
+   The report should be **self-contained** — no need to reopen the source.
+
+2. **Tone**:
+   Professional, clear, and direct. Avoid buzzwords, exaggeration, or filler language.
+
+3. **Formatting**:
+
+   * Use markdown headings (`##`, `###`) and bullet points for readability.
+   * Avoid nested lists where possible.
+   * Include external links inline.
+   * Use bold for important terms or metrics.
+
+4. **If a transcript is noisy** (e.g., filler words, small talk), remove all irrelevant text and focus on **substantive insights only**.
+
+5. **Length**:
+   Err toward **detail over brevity**, but maintain logical flow and scannability.
+
+---
+
+## Example Use Cases
+
+This format should work for:
+
+* Articles or newsletters (like *Next Play*, *Every*, *Stratechery*)
+* YouTube videos (interviews, explainers, tutorials)
+* Podcasts or talks (e.g., *Acquired*, *Lex Fridman*, *YC Startup School*)
+* Research papers, blog posts, or official product updates
+
+---
+
+## Content
+
+The current date and time is: {current_date_time}
+
+Here’s the content to analyze:
+
+```
 {content}
+```
 
-# Output
-Output your generated report here, without any additional content like "Here's the report". Don't add a main title:
+Make sure to follow the user's guidance and adapt the report accordingly:
+
+```
+{guidance}
+```
+---
+
+## Output
+
+**CRITICAL REQUIREMENTS**:
+
+1. **DO NOT include the main title in the content field** - it goes ONLY in the `title` field
+2. The `content` field should start directly with metadata or the first section (e.g., ⚡️ Summary / TL;DR)
+3. Do not add any H1 (`#`) heading in the content - use H2 (`##`) as the highest level heading
+4. Output your generated report **directly**, without preambles like "Here's your summary."
+
+Format your response as a JSON object with the following fields:
+
+```
+{format_instructions}
+```
 """
