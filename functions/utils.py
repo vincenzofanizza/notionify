@@ -339,7 +339,6 @@ class NotionInterface:
                     }
                 )
             elif part.startswith("[") and part.endswith(")"):
-                print(part)
                 link_text, link_url = part[1:-1].split("](")
                 rich_text.append(
                     {
