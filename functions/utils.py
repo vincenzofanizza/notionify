@@ -197,15 +197,27 @@ class ApifyInterface:
 
 
 class YoutubeInterface:
-    def __extract_video_id(self, url: str) -> str:
+    def __extract_video_id(self, url: str) -> str | None:
         parsed_url = urlparse(url)
-        if parsed_url.hostname == "youtu.be":
-            return parsed_url.path[1:]
-        if parsed_url.hostname in ("www.youtube.com", "youtube.com"):
+        hostname = (parsed_url.hostname or "").lower()
+
+        if hostname == "youtu.be":
+            return parsed_url.path.lstrip("/")
+
+        if hostname in (
+            "www.youtube.com",
+            "youtube.com",
+            "m.youtube.com",
+        ):
             if parsed_url.path == "/watch":
-                return parse_qs(parsed_url.query)["v"][0]
-            if parsed_url.path.startswith(("/embed/", "/v/")):
-                return parsed_url.path.split("/")[2]
+                return parse_qs(parsed_url.query).get("v", [None])[0]
+
+            if parsed_url.path.startswith(("/embed/", "/v/", "/live/", "/shorts/")):
+                path_parts = parsed_url.path.split("/")
+                # ['', 'embed', '<id>'] or ['', 'live', '<id>']
+                if len(path_parts) >= 3 and path_parts[2]:
+                    return path_parts[2]
+
         return None
 
     def __format_transcript(self, transcript: list) -> str:
@@ -526,7 +538,10 @@ class NotionInterface:
         }
 
 def is_youtube_url(url: str) -> bool:
-    return urlparse(url).netloc in ["www.youtube.com", "youtu.be"]
+    hostname = urlparse(url).hostname
+    if not hostname:
+        return False
+    return hostname.lower() in {"www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be"}
 
 def scrape_website_with_apify(url: str) -> dict:
     apify = ApifyInterface()
